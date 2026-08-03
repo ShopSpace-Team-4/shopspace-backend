@@ -1,5 +1,5 @@
 import { userRepository } from '../../DB/repository/user.repository';
-import { HashUtil } from '../../common/utils/hash.util';
+import { generateHash, compareHash } from '../../common/utils/security';
 import { NotFoundException, UnauthorizedException, DuplicateResourceException } from '../../common/exceptions';
 import { UserProfileDto, UpdateProfileDto, UpdatePasswordDto } from './user.dto';
 import { IUser } from '../../DB/models/user.model';
@@ -29,10 +29,10 @@ class UserService {
     const user = await userRepository.findByIdWithPassword(userId);
     if (!user) throw new NotFoundException('User');
 
-    const isMatch = await HashUtil.compare(dto.currentPassword, user.password);
+    const isMatch = await compareHash({ plainText: dto.currentPassword, cipherText: user.password });
     if (!isMatch) throw new UnauthorizedException('Current password is incorrect');
 
-    const hashedPassword = await HashUtil.hash(dto.newPassword);
+    const hashedPassword = await generateHash({ plainText: dto.newPassword });
     // Bump tokenVersion too, so other logged-in devices/sessions are revoked.
     await userRepository.updateById(userId, {
       password: hashedPassword,
@@ -54,7 +54,7 @@ class UserService {
       phone: user.phone,
       role: user.role,
       isVerified: user.isVerified,
-      createdAt: user.createdAt,
+      createdAt: user.createdAt!,
     };
   }
 }

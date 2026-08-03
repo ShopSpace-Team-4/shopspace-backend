@@ -1,35 +1,33 @@
-import express, { Application } from 'express';
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import { config } from './config/config';
-import { authRoutes } from './modules/auth';
-import { userRoutes } from './modules/user';
-import { errorHandler, notFoundHandler } from './middleware/error.middleware';
-
-// Builds and configures the Express application instance.
-// Kept separate from main.ts so tests can import the app without
-// actually binding a port or opening a DB connection.
-export function createApp(): Application {
-  const app = express();
+import express from "express";
+import { PORT } from "./config/config";
+import type { Request, Response, Express, NextFunction } from "express";
+import cors from "cors"
+import cookieParser from "cookie-parser";
+import { authRoutes } from "./modules/auth";
+import { userRoutes } from "./modules/user";
+import DBConnection from "./DB/connection.db";
+import { globalErrorHandler } from "./middleware/error.middleware";
+const bootsrap = async () => {
+  const app: Express = express();
 
   // ---- Global middleware ----
-  app.use(cors({ origin: config.clientUrl, credentials: true }));
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
-  app.use(cookieParser());
+  app.use(express.json(), cors(), cookieParser())
 
-  // ---- Health check ----
-  app.get('/health', (_req, res) => {
-    res.status(200).json({ success: true, message: 'ShopSpace API is running', env: config.env });
+  app.get('/', (req: Request, res: Response, next: NextFunction) => {
+    res.status(200).json({ message: 'hello buddy 👻' })
+  })
+
+  // ---- API routes ----
+  app.use('/api/v1/auth', authRoutes)
+  app.use('/api/v1/users', userRoutes)
+
+  // ---- Error handling (must be last) ----
+  app.use(globalErrorHandler)
+  await DBConnection()
+
+
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
   });
-
-  // ---- Feature routes ----
-  app.use('/api/auth', authRoutes);
-  app.use('/api/users', userRoutes);
-
-  // ---- 404 + global error handler (must be registered last) ----
-  app.use(notFoundHandler);
-  app.use(errorHandler);
-
-  return app;
 }
+export default bootsrap

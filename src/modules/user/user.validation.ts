@@ -1,16 +1,17 @@
-import Joi from 'joi';
+import { z } from 'zod';
+import { generalValidationFields } from '../../common/validation/general.valodation';
 
-export const updateProfileSchema = Joi.object({
-  firstName: Joi.string().min(2).max(50),
-  lastName: Joi.string().min(2).max(50),
-  phone: Joi.string()
-    .pattern(/^\+?[0-9]{8,15}$/)
-    .messages({ 'string.pattern.base': 'Phone number is invalid' }),
-}).min(1); // at least one field must be provided
+const { firstName, lastName, phone, password } = generalValidationFields;
 
-export const updatePasswordSchema = Joi.object({
-  currentPassword: Joi.string().required(),
-  newPassword: Joi.string().min(8).max(64).required().messages({
-    'string.min': 'Password must be at least 8 characters long',
-  }),
+export const updateProfileSchema = z.object({
+  firstName: firstName.optional(),
+  lastName: lastName.optional(),
+  phone: phone.optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  error: 'At least one field must be provided',
+});
+
+export const updatePasswordSchema = z.object({
+  currentPassword: z.string({ error: 'currentPassword is mandatory' }),
+  newPassword: password,
 });

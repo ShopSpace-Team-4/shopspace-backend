@@ -1,44 +1,24 @@
-import { Role } from '../../common/enums/role.enum';
+import { z } from 'zod';
+import {
+  signupSchema,
+  loginSchema,
+  verifyAccountSchema,
+  resendOtpSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  refreshTokenSchema,
+} from './auth.validation';
 
-// Pure TypeScript shapes for what each auth endpoint expects/returns.
-// auth.validation.ts enforces these shapes at runtime with Joi.
-
-export interface SignupDto {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  password: string;
-  role: Role;
-}
-
-export interface LoginDto {
-  email: string;
-  password: string;
-}
-
-export interface VerifyAccountDto {
-  email: string;
-  otpCode: string;
-}
-
-export interface ResendOtpDto {
-  email: string;
-}
-
-export interface ForgotPasswordDto {
-  email: string;
-}
-
-export interface ResetPasswordDto {
-  email: string;
-  otpCode: string;
-  newPassword: string;
-}
-
-export interface RefreshTokenDto {
-  refreshToken: string;
-}
+// Pure TypeScript shapes for what each auth endpoint expects/returns,
+// derived from the zod validation schemas so the DTOs can never drift
+// apart from the runtime validation.
+export type SignupDto = z.infer<typeof signupSchema>;
+export type LoginDto = z.infer<typeof loginSchema>;
+export type VerifyAccountDto = z.infer<typeof verifyAccountSchema>;
+export type ResendOtpDto = z.infer<typeof resendOtpSchema>;
+export type ForgotPasswordDto = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>;
+export type RefreshTokenDto = z.infer<typeof refreshTokenSchema>;
 
 export interface AuthTokensDto {
   accessToken: string;

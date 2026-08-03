@@ -1,6 +1,6 @@
 import { userRepository } from '../../DB/repository/user.repository';
 import { otpService } from '../../common/services/otp.service';
-import { HashUtil } from '../../common/utils/hash.util';
+import { generateHash, compareHash } from '../../common/utils/security';
 import { JwtUtil } from '../../common/utils/jwt.util';
 import { OtpPurpose } from '../../common/enums/otp-purpose.enum';
 import { DuplicateResourceException, BadRequestException, UnauthorizedException, NotFoundException } from '../../common/exceptions';
@@ -25,12 +25,11 @@ class AuthService {
       throw new DuplicateResourceException('User', field);
     }
 
-    const hashedPassword = await HashUtil.hash(dto.password);
-
+    // Password is hashed by the User model's pre("save") hook — do NOT hash
+    // here or it would be hashed twice and login would always fail.
     const user = await userRepository.create({
       ...dto,
       email: dto.email.toLowerCase(),
-      password: hashedPassword,
       isVerified: false,
     });
 
@@ -64,7 +63,7 @@ class AuthService {
     const user = await userRepository.findByEmail(dto.email, true);
     if (!user) throw new UnauthorizedException('Invalid email or password');
 
-    const isMatch = await HashUtil.compare(dto.password, user.password);
+    const isMatch = await compareHash({ plainText: dto.password, cipherText: user.password });
     if (!isMatch) throw new UnauthorizedException('Invalid email or password');
 
     if (!user.isVerified) {
@@ -115,7 +114,7 @@ class AuthService {
 
     await otpService.verify(user._id, OtpPurpose.RESET_PASSWORD, dto.otpCode);
 
-    const hashedPassword = await HashUtil.hash(dto.newPassword);
+    const hashedPassword = await generateHash({ plainText: dto.newPassword });
     await userRepository.updateById(user._id, {
       password: hashedPassword,
       tokenVersion: user.tokenVersion + 1, // logs out every existing session

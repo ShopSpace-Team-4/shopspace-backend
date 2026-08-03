@@ -1,50 +1,41 @@
-import Joi from 'joi';
-import { Role } from '../../common/enums/role.enum';
+import { z } from 'zod';
+import { generalValidationFields } from '../../common/validation/general.valodation';
 
-// One schema per auth endpoint. Wired to routes via the generic
-// `validate()` middleware, e.g. validate(signupSchema).
-const password = Joi.string().min(8).max(64).required().messages({
-  'string.min': 'Password must be at least 8 characters long',
+// One schema per auth endpoint, composed directly from the shared
+// model-aligned fields so nothing is defined twice.
+export const signupSchema = z.object({
+  firstName: generalValidationFields.firstName,
+  lastName: generalValidationFields.lastName,
+  email: generalValidationFields.email,
+  phone: generalValidationFields.phone,
+  password: generalValidationFields.password,
+  role: generalValidationFields.role,
 });
 
-export const signupSchema = Joi.object({
-  firstName: Joi.string().min(2).max(50).required(),
-  lastName: Joi.string().min(2).max(50).required(),
-  email: Joi.string().email().required(),
-  phone: Joi.string()
-    .pattern(/^\+?[0-9]{8,15}$/)
-    .required()
-    .messages({ 'string.pattern.base': 'Phone number is invalid' }),
-  password,
-  role: Joi.string()
-    .valid(...Object.values(Role))
-    .required(),
+export const loginSchema = z.object({
+  email: generalValidationFields.email,
+  password: generalValidationFields.password,
 });
 
-export const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().required(),
+export const verifyAccountSchema = z.object({
+  email: generalValidationFields.email,
+  otpCode: generalValidationFields.otpCode,
 });
 
-export const verifyAccountSchema = Joi.object({
-  email: Joi.string().email().required(),
-  otpCode: Joi.string().length(6).pattern(/^[0-9]+$/).required(),
+export const resendOtpSchema = z.object({
+  email: generalValidationFields.email,
 });
 
-export const resendOtpSchema = Joi.object({
-  email: Joi.string().email().required(),
+export const forgotPasswordSchema = z.object({
+  email: generalValidationFields.email,
 });
 
-export const forgotPasswordSchema = Joi.object({
-  email: Joi.string().email().required(),
+export const resetPasswordSchema = z.object({
+  email: generalValidationFields.email,
+  otpCode: generalValidationFields.otpCode,
+  newPassword: generalValidationFields.newPassword,
 });
 
-export const resetPasswordSchema = Joi.object({
-  email: Joi.string().email().required(),
-  otpCode: Joi.string().length(6).pattern(/^[0-9]+$/).required(),
-  newPassword: password,
-});
-
-export const refreshTokenSchema = Joi.object({
-  refreshToken: Joi.string().required(),
+export const refreshTokenSchema = z.object({
+  refreshToken: generalValidationFields.refreshToken,
 });

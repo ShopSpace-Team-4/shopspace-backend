@@ -1,11 +1,63 @@
 import nodemailer, { Transporter } from 'nodemailer';
-import { config } from '../../config/config';
+import {
+  EMAIL_FROM,
+  EMAIL_HOST,
+  EMAIL_PASS,
+  EMAIL_PORT,
+  EMAIL_SECURE,
+  EMAIL_USER,
+  OTP_EXPIRES_IN_MINUTES,
+} from '../../config/config';
 
 interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
 }
+
+// Reusable branded layout. Inline styles only — most email clients ignore
+// <style> blocks, so everything is inlined per-element.
+const emailLayout = (body: string): string => `
+  <div style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+            <!-- Brand header -->
+            <tr>
+              <td align="center" style="padding-bottom:24px;">
+                <span style="font-size:22px;font-weight:700;color:#111827;letter-spacing:0.5px;">Shop<b style="color:#14b8a6;">Space</b></span>
+              </td>
+            </tr>
+            <!-- Card -->
+            <tr>
+              <td style="background-color:#ffffff;border-radius:12px;padding:32px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+                ${body}
+              </td>
+            </tr>
+            <!-- Footer -->
+            <tr>
+              <td align="center" style="padding-top:24px;font-size:12px;color:#9ca3af;line-height:18px;">
+                If you didn't request this, you can safely ignore this email.<br/>
+                © ${new Date().getFullYear()} ShopSpace. All rights reserved.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </div>
+`;
+
+const otpCodeBox = (otpCode: string): string => `
+  <p style="margin:0 0 8px;font-size:14px;color:#374151;">Your verification code is:</p>
+  <div style="margin:0 0 24px;padding:16px;background-color:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;text-align:center;">
+    <span style="font-size:32px;font-weight:700;color:#0f766e;letter-spacing:8px;">${otpCode}</span>
+  </div>
+  <p style="margin:0;font-size:13px;color:#6b7280;line-height:20px;">
+    This code expires in <b>${OTP_EXPIRES_IN_MINUTES} minutes</b>. For your security, never share it with anyone.
+  </p>
+`;
 
 // Single place responsible for sending transactional emails
 // (OTP codes, password-reset links, etc.) via Gmail SMTP.
@@ -14,19 +66,19 @@ class EmailService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: config.email.host,
-      port: config.email.port,
-      secure: config.email.secure, // true for port 465, false for 587
+      host: EMAIL_HOST,
+      port: EMAIL_PORT,
+      secure: EMAIL_SECURE, // true for port 465, false for 587
       auth: {
-        user: config.email.user,
-        pass: config.email.pass, // Gmail App Password, not the real account password
+        user: EMAIL_USER,
+        pass: EMAIL_PASS, // Gmail App Password, not the real account password
       },
     });
   }
 
   async send({ to, subject, html }: SendEmailOptions): Promise<void> {
     await this.transporter.sendMail({
-      from: config.email.from,
+      from: EMAIL_FROM,
       to,
       subject,
       html,
@@ -34,19 +86,27 @@ class EmailService {
   }
 
   async sendOtpEmail(to: string, otpCode: string, purpose: 'verify_account' | 'reset_password'): Promise<void> {
-    const subject =
-      purpose === 'verify_account' ? 'Verify your ShopSpace account' : 'Reset your ShopSpace password';
+    const isVerify = purpose === 'verify_account';
 
-    const html = `
-      <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
-        <h2>ShopSpace</h2>
-        <p>Your verification code is:</p>
-        <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px;">${otpCode}</p>
-        <p>This code expires in ${config.otp.expiresInMinutes} minutes. If you didn't request this, you can ignore this email.</p>
-      </div>
+    const subject = isVerify
+      ? 'Verify your ShopSpace account'
+      : 'Reset your ShopSpace password';
+
+    const title = isVerify
+      ? 'Welcome to ShopSpace 👋'
+      : 'Password reset request';
+
+    const body = `
+      <h1 style="margin:0 0 16px;font-size:20px;color:#111827;line-height:1.3;">${title}</h1>
+      <p style="margin:0 0 24px;font-size:14px;color:#374151;line-height:1.6;">
+        ${isVerify
+          ? 'You are one step away from activating your account. Enter the code below to complete your registration:'
+          : 'We received a request to reset your password. Enter the code below to set a new one:'}
+      </p>
+      ${otpCodeBox(otpCode)}
     `;
 
-    await this.send({ to, subject, html });
+    await this.send({ to, subject, html: emailLayout(body) });
   }
 }
 

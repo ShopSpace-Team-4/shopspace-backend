@@ -1,8 +1,8 @@
 import { Types } from 'mongoose';
-import { config } from '../../config/config';
+import { OTP_EXPIRES_IN_MINUTES, NODE_ENV } from '../../config/config';
 import { OtpPurpose } from '../enums/otp-purpose.enum';
 import { generateOtp } from '../utils/otp-generator.util';
-import { HashUtil } from '../utils/hash.util';
+import { generateHash, compareHash } from '../utils/security';
 import { otpTokenRepository } from '../../DB/repository/otp-token.repository';
 import { emailService } from './email.service';
 import { BadRequestException } from '../exceptions';
@@ -15,8 +15,8 @@ class OtpService {
     await otpTokenRepository.deleteAllForUserAndPurpose(userId, purpose);
 
     const plainOtp = generateOtp();
-    const hashedOtp = await HashUtil.hash(plainOtp);
-    const expiresAt = new Date(Date.now() + config.otp.expiresInMinutes * 60 * 1000);
+    const hashedOtp = await generateHash({ plainText: plainOtp });
+    const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
 
     await otpTokenRepository.create({
       userId,
@@ -24,6 +24,12 @@ class OtpService {
       purpose,
       expiresAt,
     });
+
+    // Dev convenience: surface the code in the console so you can test
+    // locally without a working SMTP setup. Never log OTPs in production.
+    if (NODE_ENV === 'development') {
+      console.log(`[OTP] ${purpose} code for ${email}: ${plainOtp} (expires ${expiresAt.toISOString()})`);
+    }
 
     await emailService.sendOtpEmail(email, plainOtp, purpose);
   }
@@ -37,7 +43,7 @@ class OtpService {
       throw new BadRequestException('OTP code is invalid or has expired');
     }
 
-    const isMatch = await HashUtil.compare(otpCode, record.otpCode);
+    const isMatch = await compareHash({ plainText: otpCode, cipherText: record.otpCode });
     if (!isMatch) {
       throw new BadRequestException('OTP code is invalid or has expired');
     }

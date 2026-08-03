@@ -7,28 +7,32 @@
     "dev": "cross-env NODE_ENV=development nodemon --exec ts-node src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "cross-env NODE_ENV=production node dist/main.js",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "start:dev": " cross-env NODE_ENV=development concurrently \"tsc --watch\" \"node --watch dist/main.js\"",
+    "start:prod": " cross-env NODE_ENV=production concurrently \"tsc --watch\" \"node --watch dist/main.js\""
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
     "express-rate-limit": "^7.4.0",
     "joi": "^17.13.3",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.5.0",
-    "nodemailer": "^6.9.14"
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.24.2",
+    "nodemailer": "^6.9.14",
+    "redis": "^4.7.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/cookie-parser": "^1.4.7",
     "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
+    "@types/express": "^5.0.6",
     "@types/jest": "^29.5.12",
-    "@types/jsonwebtoken": "^9.0.6",
-    "@types/node": "^20.14.10",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.19.43",
     "@types/nodemailer": "^6.4.15",
     "@types/supertest": "^6.0.2",
     "cross-env": "^7.0.3",
@@ -37,6 +41,19 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.3"
-  }
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShopSpace-Team-4/shopspace-backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ShopSpace-Team-4/shopspace-backend/issues"
+  },
+  "homepage": "https://github.com/ShopSpace-Team-4/shopspace-backend#readme"
 }

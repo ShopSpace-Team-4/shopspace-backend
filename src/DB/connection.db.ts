@@ -1,18 +1,14 @@
-import mongoose from 'mongoose';
-import { config } from '../config/config';
-
-// Opens the MongoDB connection once at app startup (called from main.ts).
-export async function connectDB(): Promise<void> {
+import mongoose from "mongoose";
+import { MONGO_URI } from "../config/config";
+const DBConnection = async () => {
   try {
-    mongoose.set('strictQuery', true);
-    await mongoose.connect(config.mongo.uri);
-    console.log(`[DB] Connected to MongoDB (${config.env})`);
+    await mongoose.connect(MONGO_URI)
+    console.log("Database Connected👌🏽")
   } catch (error) {
-    console.error('[DB] Connection failed:', error);
-    process.exit(1);
+    console.log(`fail to connect to db ${error}`)
   }
 
-  mongoose.connection.on('disconnected', () => {
-    console.warn('[DB] MongoDB disconnected');
-  });
 }
+
+export default DBConnection;
+

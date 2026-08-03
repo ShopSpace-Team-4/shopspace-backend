@@ -1,11 +1,11 @@
 import rateLimit from 'express-rate-limit';
-import { config } from '../config/config';
+import { RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MINUTES } from '../config/config';
 
 // Reused factory so every sensitive endpoint gets a consistent, configurable
 // limiter instead of hand-rolled logic per route.
 function makeLimiter(maxRequests: number, message: string) {
   return rateLimit({
-    windowMs: config.rateLimit.windowMinutes * 60 * 1000,
+    windowMs: RATE_LIMIT_WINDOW_MINUTES * 60 * 1000,
     max: maxRequests,
     standardHeaders: true, // return rate limit info in RateLimit-* headers
     legacyHeaders: false,
@@ -15,7 +15,7 @@ function makeLimiter(maxRequests: number, message: string) {
 
 // Brute-force protection on login.
 export const loginRateLimiter = makeLimiter(
-  config.rateLimit.maxRequests,
+  RATE_LIMIT_MAX_REQUESTS,
   'Too many login attempts. Please try again later.'
 );
 
