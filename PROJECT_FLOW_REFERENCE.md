@@ -228,7 +228,43 @@ This means:
 - a user whose `roles[]` includes `LANDLORD` can access the route, **regardless of their current `activeRole`**
 - a user whose `roles[]` is only `[TENANT]` receives a forbidden error
 
-## 5) Core Components and Their Roles
+## 5) Phase 2 Listing / Media / Saved Listings Flow
+
+### A. Listing Model
+`src/DB/models/listing.model.ts` stores marketplace listings with:
+- Basic info: `title`, `category`, `areaSqm`, `city`, `district`, `address`, `description`
+- Details: `amenities[]`, `numberOfFloors`, `floorNumber`, `availableFrom`, `minimumLeaseTerm`
+- Pricing/media: `annualRent`, response-only `annualRentWithVat`, `currency`, `securityDepositMonths`, `media[]`
+- Ownership/status: `landlordId`, `status`
+
+Indexes support filtering by `city`, `district`, `category`, `status`, and annual-rent range queries.
+
+### B. Listing CRUD Flow
+1. Landlord sends `POST /api/v1/listings`.
+2. The request must be authenticated and the user's `roles[]` must include `LANDLORD`; `activeRole` is not checked.
+3. The full 3-tab listing payload is submitted in one create call.
+4. Listings are created with `status: PENDING`.
+5. The landlord can update, delete, or transition status through owner-only endpoints.
+
+Public browsing uses `GET /api/v1/listings` and supports filters for city, district, category, price range, area range, status, amenities, pagination, and sorting. `GET /api/v1/listings/:id` returns detail data. Both include `annualRentWithVat = annualRent * 1.15` computed in the service layer, not stored in MongoDB.
+
+### C. Media Flow
+1. Landlord sends `POST /api/v1/listings/:id/media` with multipart field `photos`.
+2. `multer` validates PNG/JPG files and a 20MB max size per file.
+3. Files are stored locally under `uploads/listings` through `upload.service.ts`.
+4. The listing stores media URLs in its embedded `media[]` array.
+5. Owner-only endpoints can delete media or update `sortOrder`.
+
+This local storage service is intentionally isolated so S3 or Cloudinary can replace it later without changing controller logic.
+
+### D. Saved Listings Flow
+1. Authenticated user sends `POST /api/v1/listings/:id/save`.
+2. The listing id is added idempotently to `user.savedListings`.
+3. `DELETE /api/v1/listings/:id/save` removes it idempotently.
+4. `GET /api/v1/users/me/saved-listings` returns card-friendly populated listing data for the tenant Saved Listings screen.
+5. `GET /api/v1/listings` and `GET /api/v1/listings/:id` include `isSaved` when the request has a valid authenticated user.
+
+## 6) Core Components and Their Roles
 
 ### Controllers
 - Handle HTTP routing and response shaping.
@@ -254,7 +290,7 @@ This means:
 ### Utilities
 - JWT, password hashing, OTP generation, and encryption helpers live here.
 
-## 6) Important Notes About the Current Design
+## 7) Important Notes About the Current Design
 
 - The authentication flow is split into thin controller layers and service-oriented logic.
 - OTPs are hashed before storage and compared during verification.
@@ -265,8 +301,19 @@ This means:
 - **Phone is still required for local signup, but optional in storage/profile output.** Google ID tokens do not include a phone number, so Google-only accounts are allowed to start without one. A local signup request still validates and requires `phone`.
 - **Role switching is a UI concern, authorization is not.** `activeRole` never appears in JWT claims and is never checked by `authorization.middleware.ts`. Only `roles[]` gates access. This was a deliberate decision to avoid the confusing case of a user being denied access to something they're actually allowed to do, just because of which dashboard they last viewed.
 - **Adding a role reissues tokens; switching the active role does not.** This distinction matters because one changes what the user can do (needs a fresh token to reflect it immediately) and the other only changes what's displayed.
+- **Listings use manual status transitions.** New listings default to `PENDING`; `PATCH /api/v1/listings/:id/status` is the explicit path to mark a listing `AVAILABLE`, `RENTED`, or `EXPIRED`.
+- **City/district are structured fields.** They are required for search and filtering, while `address` should be street/building detail.
+- **Media is local for now.** The upload service is deliberately small and swappable for cloud storage later.
 
-## 7) Suggested Reading Order
+## 8) Flagged Product Decisions
+
+- Confirm the complete listing category dropdown. The backend currently uses a starter enum: Retail, Showroom, Office, Warehouse, Kiosk, Restaurant, Other.
+- Confirm whether publishing should remain a manual status transition. The backend currently creates listings as `PENDING` and uses `PATCH /listings/:id/status` to move to `AVAILABLE`.
+- Confirm whether the 3-tab listing flow should stay as one full create request. The backend currently assumes the frontend submits once from "Publish Listing", not incremental draft saves.
+- Add `city` and `district` to the frontend Add Listing Basic Info form. They should be dropdowns from the same city/district source used by Personal Details, and `address` should be narrowed to street/building detail.
+- Confirm whether `minimumLeaseTerm` should remain free text or become a structured number+unit pair.
+
+## 9) Suggested Reading Order
 
 If you want to understand the project quickly, read these files in order:
 
@@ -280,3 +327,10 @@ If you want to understand the project quickly, read these files in order:
 8. `src/common/services/google-auth.service.ts`
 9. `src/DB/repository/user.repository.ts`
 10. `src/DB/models/user.model.ts` — note `roles[]` vs `activeRole`
+
+Additional Phase 2 reading:
+- `src/DB/models/listing.model.ts`
+- `src/modules/listing/listing.service.ts`
+- `src/modules/listing/listing.routes.ts`
+- `src/modules/media/media.routes.ts`
+- `src/common/services/upload.service.ts`

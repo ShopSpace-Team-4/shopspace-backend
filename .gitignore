@@ -5,3 +5,7 @@ dist
 *.log
 .DS_Store
 coverage
+FRONTEND_PHASE1_API_GUIDE.md
+uploads
+.env.production
+.env.development

@@ -32,3 +32,20 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
     next(new UnauthorizedException('Invalid or expired token'));
   }
 }
+
+export async function optionalAuthenticate(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return next();
+
+    const token = authHeader.split(' ')[1];
+    const payload = JwtUtil.verifyAccessToken(token);
+    const user = await userRepository.findById(payload.userId);
+    if (!user || user.tokenVersion !== payload.tokenVersion) return next();
+
+    req.user = payload;
+    return next();
+  } catch {
+    return next();
+  }
+}

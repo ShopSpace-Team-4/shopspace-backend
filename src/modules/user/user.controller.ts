@@ -5,6 +5,7 @@ import { UnauthorizedException } from '../../common/exceptions';
 import { validate } from '../../common/validation/general.valodation';
 import { activeRoleSchema, addRoleSchema, linkGoogleSchema, updateProfileSchema, updatePasswordSchema } from './user.validation';
 import { authenticate } from '../../middleware/authentication.middleware';
+import { listingService } from '../listing/listing.service';
 
 const router = Router();
 
@@ -15,6 +16,12 @@ router.get('/me', async (req: Request, res: Response) => {
   if (!req.user) throw new UnauthorizedException();
   const profile = await userService.getMe(req.user.userId);
   return successResponse({ res, data: profile });
+});
+
+router.get('/me/saved-listings', async (req: Request, res: Response) => {
+  if (!req.user) throw new UnauthorizedException();
+  const listings = await listingService.getSavedListings(req.user.userId);
+  return successResponse({ res, data: listings });
 });
 
 router.put('/me', validate(updateProfileSchema), async (req: Request, res: Response) => {

@@ -35,6 +35,7 @@ const userSchema = new Schema<IUser>({
     },
     googleId: { type: String, unique: true, sparse: true },
     avatarUrl: { type: String },
+    savedListings: [{ type: Schema.Types.ObjectId, ref: "Listing", default: [] }],
     isVerified: { type: Boolean, default: false },
     tokenVersion: { type: Number, default: 0 },
 }, {
