@@ -9,7 +9,6 @@ export const signupSchema = z.object({
   email: generalValidationFields.email,
   phone: generalValidationFields.phone,
   password: generalValidationFields.password,
-  role: generalValidationFields.role,
 });
 
 export const loginSchema = z.object({
@@ -38,4 +37,8 @@ export const resetPasswordSchema = z.object({
 
 export const refreshTokenSchema = z.object({
   refreshToken: generalValidationFields.refreshToken,
+});
+
+export const googleAuthSchema = z.object({
+  idToken: z.string({ error: 'idToken is mandatory' }).min(1, { error: 'idToken is mandatory' }),
 });

@@ -28,6 +28,8 @@ export const EMAIL_USER = process.env.EMAIL_USER as string
 export const EMAIL_PASS = process.env.EMAIL_PASS as string
 export const EMAIL_FROM = process.env.EMAIL_FROM ?? "ShopSpace <no-reply@shopspace.com>"
 
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string
+
 export const RATE_LIMIT_WINDOW_MINUTES = parseInt(process.env.RATE_LIMIT_WINDOW_MINUTES ?? "15")
 export const RATE_LIMIT_MAX_REQUESTS = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS ?? "10")
 export const SALT_ROUND = parseInt(process.env.SALT_ROUND ?? "10")

@@ -8,7 +8,7 @@ import {
   REFRESH_TOKEN_EXPIRES_IN,
   ACCESS_TOKEN_EXPIRES_IN,
 } from "../../config/config";
-import { RoleEnum } from "../../common/enums";
+import { Role, RoleEnum } from "../../common/enums";
 import { TokenTypeEnum } from "../../common/enums";
 import { BadRequestException, UnauthorizedException, NotFoundException } from "../../common/exceptions";
 import { ILoginResponse } from "../../modules/auth/auth.entity"
@@ -123,8 +123,12 @@ export class TokenService {
         return { user: user as HydratedDocument<IUser>, decoded }
     }
     createLoginCredentials = async (user: HydratedDocument<IUser>, issuer: string): Promise<ILoginResponse> => {
+        const roles = user.roles?.length ? user.roles : [Role.TENANT];
+        const signatureLevel = roles.includes(RoleEnum.ADMIN as unknown as Role)
+            ? RoleEnum.ADMIN
+            : RoleEnum.TENANT;
         const { accessSignature, refreshSignature } =
-            await this.detectSignatureLevel(user.role as unknown as RoleEnum);
+            await this.detectSignatureLevel(signatureLevel);
 
         const jwtid = randomUUID();
 
@@ -135,7 +139,7 @@ export class TokenService {
                 issuer,
                 audience: [
                     TokenTypeEnum.ACCESS as unknown as string,
-                    user.role as unknown as string,
+                    signatureLevel as unknown as string,
                 ],
                 expiresIn: ACCESS_TOKEN_EXPIRES_IN as SignOptions["expiresIn"],
                 jwtid,
@@ -149,7 +153,7 @@ export class TokenService {
                 issuer,
                 audience: [
                     TokenTypeEnum.REFRESH as unknown as string,
-                    user.role as unknown as string,
+                    signatureLevel as unknown as string,
                 ],
                 expiresIn: REFRESH_TOKEN_EXPIRES_IN as SignOptions["expiresIn"],
                 jwtid,

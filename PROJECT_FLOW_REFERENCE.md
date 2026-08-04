@@ -57,7 +57,7 @@ shopspace-backend/
 │   │   ├── connection.db.ts
 │   │   ├── models/
 │   │   │   ├── otp-token.model.ts
-│   │   │   └── user.model.ts                 # roles[], activeRole, googleId?, avatarUrl?, password now optional
+│   │   │   └── user.model.ts                 # roles[], activeRole, googleId?, avatarUrl?, password now optional; phone optional for Google-only accounts
 │   │   └── repository/
 │   │       ├── base.repository.ts
 │   │       ├── index.ts
@@ -164,7 +164,7 @@ The current backend is built around an Express + TypeScript + MongoDB architectu
 3. `auth.service.ts` looks the user up:
    - **Found by `googleId`** → log in immediately, issue tokens.
    - **Not found by `googleId`, but an account exists with that email and no `googleId` linked** → **rejected**, not auto-linked. The response tells the client to log in with the existing password-based account and link Google from account settings instead.
-   - **No account exists at all for that email** → a new user is created: no password, `googleId` set, `isVerified: true` (Google already verified the email, so the OTP step is skipped for this path only), `roles: [Role.TENANT]`, `activeRole: Role.TENANT`.
+   - **No account exists at all for that email** → a new user is created: no password, no phone number, `googleId` set, `isVerified: true` (Google already verified the email, so the OTP step is skipped for this path only), `roles: [Role.TENANT]`, `activeRole: Role.TENANT`.
 4. Tokens are issued and returned the same way as regular login.
 5. **This is deliberately explicit-linking, not auto-linking** — see the design note in section 4.
 
@@ -262,6 +262,7 @@ This means:
 - The authenticate middleware protects routes that require a logged-in user.
 - Global error handling centralizes exceptions and response formatting.
 - **Google Sign-In uses explicit linking, not auto-linking by email.** A local account and a Google sign-in attempt on the same email are treated as separate until the user deliberately links them while logged in via `PATCH /users/me/link-google`. This is a deliberate security choice: auto-linking by email would let an attacker who temporarily controls someone's email complete a Google OAuth flow and gain access to an existing account without ever knowing its password.
+- **Phone is still required for local signup, but optional in storage/profile output.** Google ID tokens do not include a phone number, so Google-only accounts are allowed to start without one. A local signup request still validates and requires `phone`.
 - **Role switching is a UI concern, authorization is not.** `activeRole` never appears in JWT claims and is never checked by `authorization.middleware.ts`. Only `roles[]` gates access. This was a deliberate decision to avoid the confusing case of a user being denied access to something they're actually allowed to do, just because of which dashboard they last viewed.
 - **Adding a role reissues tokens; switching the active role does not.** This distinction matters because one changes what the user can do (needs a fresh token to reflect it immediately) and the other only changes what's displayed.
 

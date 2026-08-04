@@ -4,6 +4,8 @@ import { generateHash, compareHash } from '../../common/utils/security';
 import { JwtUtil } from '../../common/utils/jwt.util';
 import { OtpPurpose } from '../../common/enums/otp-purpose.enum';
 import { DuplicateResourceException, BadRequestException, UnauthorizedException, NotFoundException } from '../../common/exceptions';
+import { Role } from '../../common/enums/role.enum';
+import { googleAuthService } from '../../common/services/google-auth.service';
 import {
   SignupDto,
   LoginDto,
@@ -12,6 +14,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   RefreshTokenDto,
+  GoogleAuthDto,
   AuthTokensDto,
 } from './auth.dto';
 import { IUser } from '../../DB/models/user.model';
@@ -30,6 +33,8 @@ class AuthService {
     const user = await userRepository.create({
       ...dto,
       email: dto.email.toLowerCase(),
+      roles: [Role.TENANT],
+      activeRole: Role.TENANT,
       isVerified: false,
     });
 
@@ -63,12 +68,37 @@ class AuthService {
     const user = await userRepository.findByEmail(dto.email, true);
     if (!user) throw new UnauthorizedException('Invalid email or password');
 
+    if (!user.password) throw new UnauthorizedException('Invalid email or password');
     const isMatch = await compareHash({ plainText: dto.password, cipherText: user.password });
     if (!isMatch) throw new UnauthorizedException('Invalid email or password');
 
     if (!user.isVerified) {
       throw new UnauthorizedException('Please verify your account before logging in');
     }
+
+    return this.issueTokens(user);
+  }
+
+  async loginWithGoogle(dto: GoogleAuthDto): Promise<AuthTokensDto> {
+    const profile = await googleAuthService.verifyGoogleIdToken(dto.idToken);
+    const googleUser = await userRepository.findByGoogleId(profile.googleId);
+    if (googleUser) return this.issueTokens(googleUser);
+
+    const emailUser = await userRepository.findByEmail(profile.email);
+    if (emailUser) {
+      throw new BadRequestException('An account with this email already exists. Log in and link Google from your account settings.');
+    }
+
+    const user = await userRepository.create({
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      email: profile.email,
+      googleId: profile.googleId,
+      avatarUrl: profile.avatarUrl,
+      isVerified: true,
+      roles: [Role.TENANT],
+      activeRole: Role.TENANT,
+    });
 
     return this.issueTokens(user);
   }
@@ -122,8 +152,9 @@ class AuthService {
   }
 
   // ---- Shared helper: sign a fresh access + refresh token pair ----
-  private issueTokens(user: IUser): AuthTokensDto {
-    const payload = { userId: user._id.toString(), role: user.role, tokenVersion: user.tokenVersion };
+  issueTokens(user: IUser): AuthTokensDto {
+    const roles = user.roles?.length ? user.roles : [Role.TENANT];
+    const payload = { userId: user._id.toString(), roles, tokenVersion: user.tokenVersion };
     return {
       accessToken: JwtUtil.signAccessToken(payload),
       refreshToken: JwtUtil.signRefreshToken(payload),

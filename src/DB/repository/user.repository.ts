@@ -16,6 +16,10 @@ export class UserRepository extends BaseRepository<IUser> {
     return UserModel.findOne({ $or: [{ email: email.toLowerCase() }, { phone }] }).exec();
   }
 
+  async findByGoogleId(googleId: string): Promise<IUser | null> {
+    return UserModel.findOne({ googleId }).exec();
+  }
+
   async findByIdWithPassword(id: string): Promise<IUser | null> {
     return UserModel.findById(id).select('+password').exec();
   }

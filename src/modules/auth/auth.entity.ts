@@ -20,6 +20,6 @@ export interface ISignupResponse {
 // Payload of a decoded JWT after verification.
 export interface IDecodedToken {
   userId: string;
-  role: string;
+  roles: string[];
   tokenVersion: number;
 }

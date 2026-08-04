@@ -7,6 +7,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   refreshTokenSchema,
+  googleAuthSchema,
 } from './auth.validation';
 
 // Pure TypeScript shapes for what each auth endpoint expects/returns,
@@ -19,6 +20,7 @@ export type ResendOtpDto = z.infer<typeof resendOtpSchema>;
 export type ForgotPasswordDto = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>;
 export type RefreshTokenDto = z.infer<typeof refreshTokenSchema>;
+export type GoogleAuthDto = z.infer<typeof googleAuthSchema>;
 
 export interface AuthTokensDto {
   accessToken: string;

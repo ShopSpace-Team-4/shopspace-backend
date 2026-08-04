@@ -11,6 +11,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   refreshTokenSchema,
+  googleAuthSchema,
 } from './auth.validation';
 import { authenticate } from '../../middleware/authentication.middleware';
 import { loginRateLimiter, forgotPasswordRateLimiter, resendOtpRateLimiter } from '../../middleware/rate-limit.middleware';
@@ -27,6 +28,11 @@ router.post('/signup', validate(signupSchema), async (req: Request, res: Respons
 router.post('/login', loginRateLimiter, validate(loginSchema), async (req: Request, res: Response) => {
   const tokens = await authService.login(req.body);
   return successResponse({ res, data: tokens, message: 'Login successful' });
+});
+
+router.post('/google', validate(googleAuthSchema), async (req: Request, res: Response) => {
+  const tokens = await authService.loginWithGoogle(req.body);
+  return successResponse({ res, data: tokens, message: 'Google login successful' });
 });
 
 router.post('/verify', validate(verifyAccountSchema), async (req: Request, res: Response) => {

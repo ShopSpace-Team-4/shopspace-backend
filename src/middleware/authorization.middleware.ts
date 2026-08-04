@@ -5,7 +5,8 @@ export const authorization = (accessRoles: Role[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.user) throw new UnauthorizedException();
 
-        if (!accessRoles.includes(req.user.role)) {
+        const hasAllowedRole = req.user.roles.some((role) => accessRoles.includes(role));
+        if (!hasAllowedRole) {
             throw new ForbiddenException("Not authorized account");
         }
 

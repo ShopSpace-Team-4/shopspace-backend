@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "ShopSpace - Phase 1 (Auth & Users)",
-    "description": "Covers all 12 Phase 1 endpoints: signup, login, verify, resend-otp, logout, refresh-token, forgot-password, reset-password, GET/PUT /users/me, PUT /users/me/password, DELETE /users/me.",
+    "description": "Covers Phase 1 auth/users endpoints, including multi-role account flows and explicit Google Sign-In linking.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -31,7 +31,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Tenant\",\n  \"email\": \"{{email}}\",\n  \"phone\": \"{{phone}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"tenant\"\n}"
+              "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Tenant\",\n  \"email\": \"{{email}}\",\n  \"phone\": \"{{phone}}\",\n  \"password\": \"{{password}}\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/signup", "host": ["{{baseUrl}}"], "path": ["auth", "signup"] }
           }
@@ -57,7 +57,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Another\",\n  \"lastName\": \"User\",\n  \"email\": \"{{email}}\",\n  \"phone\": \"01111111111\",\n  \"password\": \"{{password}}\",\n  \"role\": \"tenant\"\n}"
+              "raw": "{\n  \"firstName\": \"Another\",\n  \"lastName\": \"User\",\n  \"email\": \"{{email}}\",\n  \"phone\": \"01111111111\",\n  \"password\": \"{{password}}\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/signup", "host": ["{{baseUrl}}"], "path": ["auth", "signup"] }
           }
@@ -83,7 +83,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Another\",\n  \"lastName\": \"User\",\n  \"email\": \"someone.else@example.com\",\n  \"phone\": \"{{phone}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"tenant\"\n}"
+              "raw": "{\n  \"firstName\": \"Another\",\n  \"lastName\": \"User\",\n  \"email\": \"someone.else@example.com\",\n  \"phone\": \"{{phone}}\",\n  \"password\": \"{{password}}\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/signup", "host": ["{{baseUrl}}"], "path": ["auth", "signup"] }
           }
@@ -104,7 +104,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Weak\",\n  \"lastName\": \"Pass\",\n  \"email\": \"weakpass@example.com\",\n  \"phone\": \"01222222222\",\n  \"password\": \"123\",\n  \"role\": \"tenant\"\n}"
+              "raw": "{\n  \"firstName\": \"Weak\",\n  \"lastName\": \"Pass\",\n  \"email\": \"weakpass@example.com\",\n  \"phone\": \"01222222222\",\n  \"password\": \"123\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/signup", "host": ["{{baseUrl}}"], "path": ["auth", "signup"] }
           }
@@ -194,6 +194,34 @@
             "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
           },
           "description": "Run this AFTER Verify Account succeeds. Auto-saves accessToken and refreshToken."
+        },
+        {
+          "name": "Google Sign-In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Tokens returned', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.accessToken).to.exist;",
+                  "  pm.expect(body.data.refreshToken).to.exist;",
+                  "  pm.environment.set('accessToken', body.data.accessToken);",
+                  "  pm.environment.set('refreshToken', body.data.refreshToken);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"idToken\": \"{{googleIdToken}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/google", "host": ["{{baseUrl}}"], "path": ["auth", "google"] }
+          },
+          "description": "Paste a real Google ID token from a frontend Google OAuth flow into {{googleIdToken}} before running. This does not auto-link existing local accounts with the same email."
         },
         {
           "name": "Login - Wrong Password (expect 401)",
@@ -396,6 +424,81 @@
             "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Updated\"\n}" },
             "url": { "raw": "{{baseUrl}}/users/me", "host": ["{{baseUrl}}"], "path": ["users", "me"] }
           }
+        },
+        {
+          "name": "Add Landlord Role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Fresh tokens returned', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.tokens.accessToken).to.exist;",
+                  "  pm.expect(body.data.tokens.refreshToken).to.exist;",
+                  "  pm.environment.set('accessToken', body.data.tokens.accessToken);",
+                  "  pm.environment.set('refreshToken', body.data.tokens.refreshToken);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"landlord\"\n}" },
+            "url": { "raw": "{{baseUrl}}/users/me/roles", "host": ["{{baseUrl}}"], "path": ["users", "me", "roles"] }
+          },
+          "description": "Adds a role idempotently and returns fresh access/refresh tokens because roles affect authorization."
+        },
+        {
+          "name": "Set Active Role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"landlord\"\n}" },
+            "url": { "raw": "{{baseUrl}}/users/me/active-role", "host": ["{{baseUrl}}"], "path": ["users", "me", "active-role"] }
+          },
+          "description": "Switches UI preference only. Run Add Landlord Role first, otherwise this should fail validation in the service."
+        },
+        {
+          "name": "Link Google Account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"idToken\": \"{{googleIdToken}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/users/me/link-google", "host": ["{{baseUrl}}"], "path": ["users", "me", "link-google"] }
+          },
+          "description": "Paste a real Google ID token from a frontend Google OAuth flow into {{googleIdToken}} before running. This is the only endpoint that links Google to an existing local account."
         },
         {
           "name": "Update Password",

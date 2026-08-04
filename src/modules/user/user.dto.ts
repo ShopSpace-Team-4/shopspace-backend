@@ -6,8 +6,10 @@ export interface UserProfileDto {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
-  role: Role;
+  phone?: string;
+  roles: Role[];
+  activeRole: Role;
+  avatarUrl?: string;
   isVerified: boolean;
   createdAt: Date;
 }
@@ -21,4 +23,12 @@ export interface UpdateProfileDto {
 export interface UpdatePasswordDto {
   currentPassword: string;
   newPassword: string;
+}
+
+export interface RoleDto {
+  role: Role;
+}
+
+export interface LinkGoogleDto {
+  idToken: string;
 }

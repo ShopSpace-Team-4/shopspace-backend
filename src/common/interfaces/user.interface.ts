@@ -6,9 +6,12 @@ export interface IUser {
     firstName: string
     lastName: string
     email: string
-    phone: string
-    password: string
-    role: Role
+    phone?: string
+    password?: string
+    roles: Role[]
+    activeRole: Role
+    googleId?: string
+    avatarUrl?: string
     isVerified: boolean
     tokenVersion: number
     changeCredentialsTime?: Date
