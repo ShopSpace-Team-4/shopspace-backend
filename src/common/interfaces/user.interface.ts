@@ -12,6 +12,7 @@ export interface IUser {
     activeRole: Role
     googleId?: string
     avatarUrl?: string
+    savedListings: Types.ObjectId[]
     isVerified: boolean
     tokenVersion: number
     changeCredentialsTime?: Date
