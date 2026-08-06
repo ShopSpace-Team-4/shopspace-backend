@@ -15,8 +15,9 @@ const param = (value: string | string[]) => Array.isArray(value) ? value[0] : va
 mediaRoutes.post('/', authenticate, uploadListingPhotos, async (req: Request, res: Response) => {
   if (!req.user) throw new UnauthorizedException();
   const files = (req.files || []) as Express.Multer.File[];
-  const urls = files.map((file) => uploadService.toStoredUpload(file).url);
-  const listing = await listingService.addMedia(param(req.params.id), req.user.userId, urls);
+  const listingId = param(req.params.id);
+  const uploads = await Promise.all(files.map((file) => uploadService.toStoredUpload(file, listingId)));
+  const listing = await listingService.addMedia(listingId, req.user.userId, uploads);
   return successResponse({ res, data: listing, message: 'Listing media uploaded successfully', status: 201 });
 });
 

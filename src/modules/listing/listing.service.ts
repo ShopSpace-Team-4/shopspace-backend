@@ -5,6 +5,7 @@ import { IListing, IListingMedia } from '../../common/interfaces/listing.interfa
 import { BadRequestException, ForbiddenException, NotFoundException } from '../../common/exceptions';
 import { ListingAmenity, ListingStatus, MediaType, Role } from '../../common/enums';
 import { CreateListingDto, ReorderMediaDto, UpdateListingDto, UpdateListingStatusDto } from './listing.dto';
+import { StoredUpload, uploadService } from '../../common/services/upload.service';
 
 type ListingQuery = Record<string, string | string[] | undefined>;
 
@@ -80,13 +81,14 @@ class ListingService {
     return this.toListingResponse(updated, userId);
   }
 
-  async addMedia(id: string, userId: string, urls: string[]) {
+  async addMedia(id: string, userId: string, uploads: StoredUpload[]) {
     const listing = await this.findOwnedListing(id, userId);
     const media = [
       ...listing.media,
-      ...urls.map((url, index) => ({
+      ...uploads.map((upload, index) => ({
         mediaType: MediaType.IMAGE,
-        url,
+        url: upload.url,
+        publicId: upload.publicId,
         sortOrder: listing.media.length + index,
       })),
     ];
@@ -97,6 +99,12 @@ class ListingService {
 
   async deleteMedia(id: string, userId: string, mediaId: string) {
     const listing = await this.findOwnedListing(id, userId);
+    const deletedMedia = listing.media.find((item) => item._id?.toString() === mediaId);
+    if (deletedMedia?.publicId) {
+      uploadService.delete(deletedMedia.publicId).catch((error) => {
+        console.error(`Failed to delete Cloudinary media ${deletedMedia.publicId}`, error);
+      });
+    }
     const media = listing.media.filter((item) => item._id?.toString() !== mediaId);
     const updated = await listingRepository.updateById(listing._id, { media });
     if (!updated) throw new NotFoundException('Listing');
@@ -211,6 +219,12 @@ class ListingService {
 
   private toListingResponse(listing: IListing, userId?: string, savedIds = new Set<string>()) {
     const sortedMedia = [...listing.media].sort((a, b) => a.sortOrder - b.sortOrder);
+    const responseMedia = sortedMedia.map((item) => ({
+      _id: item._id,
+      mediaType: item.mediaType,
+      url: item.url,
+      sortOrder: item.sortOrder,
+    }));
     return {
       id: listing._id.toString(),
       landlordId: listing.landlordId.toString(),
@@ -231,7 +245,7 @@ class ListingService {
       currency: listing.currency,
       securityDepositMonths: listing.securityDepositMonths,
       status: listing.status,
-      media: sortedMedia,
+      media: responseMedia,
       thumbnailUrl: this.getThumbnailUrl(sortedMedia),
       isSaved: userId ? savedIds.has(listing._id.toString()) : undefined,
       createdAt: listing.createdAt,

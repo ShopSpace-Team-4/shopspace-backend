@@ -8,6 +8,7 @@ const listingMediaSchema = new Schema(
   {
     mediaType: { type: String, enum: Object.values(MediaType), required: true },
     url: { type: String, required: true },
+    publicId: { type: String, required: true },
     sortOrder: { type: Number, default: 0 },
   },
   { _id: true }
