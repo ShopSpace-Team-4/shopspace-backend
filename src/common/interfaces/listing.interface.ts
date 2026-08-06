@@ -5,6 +5,7 @@ export interface IListingMedia {
   _id?: Types.ObjectId;
   mediaType: MediaType;
   url: string;
+  publicId: string;
   sortOrder: number;
 }
 

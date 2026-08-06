@@ -1,36 +1,55 @@
-import { mkdirSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { Readable } from 'node:stream';
+import { v2 as cloudinarySdk, UploadApiResponse } from 'cloudinary';
 import { Request } from 'express';
 import multer from 'multer';
 import { BadRequestException } from '../exceptions';
+import { cloudinary } from '../../config/config';
 
 export interface StoredUpload {
   url: string;
+  publicId: string;
 }
 
-class LocalUploadService {
-  private readonly uploadRoot = join(process.cwd(), 'uploads', 'listings');
-
+class CloudinaryUploadService {
   constructor() {
-    mkdirSync(this.uploadRoot, { recursive: true });
-  }
-
-  getStorage(): multer.StorageEngine {
-    return multer.diskStorage({
-      destination: (_req, _file, cb) => cb(null, this.uploadRoot),
-      filename: (_req, file, cb) => {
-        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
-        cb(null, uniqueName);
-      },
+    cloudinarySdk.config({
+      cloud_name: cloudinary.cloudName,
+      api_key: cloudinary.apiKey,
+      api_secret: cloudinary.apiSecret,
     });
   }
 
-  toStoredUpload(file: Express.Multer.File): StoredUpload {
-    return { url: `/uploads/listings/${file.filename}` };
+  getStorage(): multer.StorageEngine {
+    return multer.memoryStorage();
+  }
+
+  async toStoredUpload(file: Express.Multer.File, listingId: string): Promise<StoredUpload> {
+    if (!file.buffer) throw new BadRequestException('Upload file buffer is missing');
+    const result = await this.uploadBuffer(file.buffer, `shopspace/listings/${listingId}`);
+    return {
+      url: result.secure_url,
+      publicId: result.public_id,
+    };
+  }
+
+  async delete(publicId: string) {
+    await cloudinarySdk.uploader.destroy(publicId);
+  }
+
+  private uploadBuffer(buffer: Buffer, folder: string) {
+    return new Promise<UploadApiResponse>((resolve, reject) => {
+      const uploadStream = cloudinarySdk.uploader.upload_stream({ folder }, (error, result) => {
+        if (error) return reject(error);
+        if (!result) return reject(new Error('Cloudinary upload did not return a result'));
+        return resolve(result);
+      });
+
+      Readable.from(buffer).pipe(uploadStream);
+    });
   }
 }
 
-export const uploadService = new LocalUploadService();
+export const uploadService = new CloudinaryUploadService();
 
 export const imageFileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   if (['image/png', 'image/jpeg', 'image/jpg'].includes(file.mimetype)) {

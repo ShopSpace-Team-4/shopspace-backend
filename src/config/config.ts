@@ -5,6 +5,12 @@ config({
   path: resolve(`./.env.${process.env.NODE_ENV ?? "development"}`)
 })
 
+const required = (key: string) => {
+  const value = process.env[key]
+  if (!value) throw new Error(`Missing required environment variable: ${key}`)
+  return value
+}
+
 export const NODE_ENV = process.env.NODE_ENV ?? "development"
 export const PORT = parseInt(process.env.PORT ?? "3000")
 export const CLIENT_URL = process.env.CLIENT_URL ?? "*"
@@ -37,6 +43,12 @@ export const ENC_IV_LENGTH = parseInt(process.env.ENC_IV_LENGTH ?? '16')
 export const ENC_KEY = process.env.ENC_KEY as string
 
 export const REDIS_URI = process.env.REDIS_URI ?? "redis://localhost:6379"
+
+export const cloudinary = {
+  cloudName: required('CLOUDINARY_CLOUD_NAME'),
+  apiKey: required('CLOUDINARY_API_KEY'),
+  apiSecret: required('CLOUDINARY_API_SECRET'),
+}
 
 export const USER_ACCESS_TOKEN_SIGNATURE = process.env.JWT_ACCESS_SECRET as string
 export const USER_REFRESH_TOKEN_SIGNATURE = process.env.JWT_REFRESH_SECRET as string
