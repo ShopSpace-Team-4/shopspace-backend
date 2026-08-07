@@ -1,13 +1,11 @@
-import nodemailer, { Transporter } from 'nodemailer';
+import { BrevoClient, BrevoError } from '@getbrevo/brevo';
 import {
+  BREVO_API_KEY,
   EMAIL_FROM,
-  EMAIL_HOST,
-  EMAIL_PASS,
-  EMAIL_PORT,
-  EMAIL_SECURE,
-  EMAIL_USER,
+  EMAIL_FROM_NAME,
   OTP_EXPIRES_IN_MINUTES,
 } from '../../config/config';
+import { ServiceUnavailableException } from '../exceptions';
 
 interface SendEmailOptions {
   to: string;
@@ -60,29 +58,40 @@ const otpCodeBox = (otpCode: string): string => `
 `;
 
 // Single place responsible for sending transactional emails
-// (OTP codes, password-reset links, etc.) via Gmail SMTP.
+// (OTP codes, password-reset links, etc.) via Brevo.
 class EmailService {
-  private transporter: Transporter;
+  private brevo: BrevoClient;
 
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: EMAIL_HOST,
-      port: EMAIL_PORT,
-      secure: EMAIL_SECURE, // true for port 465, false for 587
-      auth: {
-        user: EMAIL_USER,
-        pass: EMAIL_PASS, // Gmail App Password, not the real account password
-      },
+    this.brevo = new BrevoClient({
+      apiKey: BREVO_API_KEY,
     });
   }
 
   async send({ to, subject, html }: SendEmailOptions): Promise<void> {
-    await this.transporter.sendMail({
-      from: EMAIL_FROM,
-      to,
-      subject,
-      html,
-    });
+    try {
+      await this.brevo.transactionalEmails.sendTransacEmail({
+        sender: {
+          email: EMAIL_FROM,
+          name: EMAIL_FROM_NAME,
+        },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      });
+    } catch (error) {
+      if (error instanceof BrevoError) {
+        console.error('Brevo email API error', {
+          statusCode: error.statusCode,
+          message: error.message,
+          body: error.body,
+        });
+      } else {
+        console.error('Unexpected Brevo email error', error);
+      }
+
+      throw new ServiceUnavailableException('Email delivery failed. Please try again later.', error);
+    }
   }
 
   async sendOtpEmail(to: string, otpCode: string, purpose: 'verify_account' | 'reset_password'): Promise<void> {
