@@ -8,7 +8,7 @@ import { emailService } from './email.service';
 import { BadRequestException } from '../exceptions';
 
 // Orchestrates the full OTP lifecycle. auth.service.ts calls this rather
-// than touching the OtpToken model or nodemailer directly.
+// than touching the OtpToken model or email provider directly.
 class OtpService {
   async generateAndSend(userId: Types.ObjectId, email: string, purpose: OtpPurpose): Promise<void> {
     // Invalidate any previous unused codes for this purpose first.

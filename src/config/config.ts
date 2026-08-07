@@ -27,12 +27,9 @@ export const BCRYPT_SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS ?? "10
 export const OTP_LENGTH = parseInt(process.env.OTP_LENGTH ?? "6")
 export const OTP_EXPIRES_IN_MINUTES = parseInt(process.env.OTP_EXPIRES_IN_MINUTES ?? "10")
 
-export const EMAIL_HOST = process.env.EMAIL_HOST ?? "smtp.gmail.com"
-export const EMAIL_PORT = parseInt(process.env.EMAIL_PORT ?? "465")
-export const EMAIL_SECURE = process.env.EMAIL_SECURE === "true"
-export const EMAIL_USER = process.env.EMAIL_USER as string
-export const EMAIL_PASS = process.env.EMAIL_PASS as string
-export const EMAIL_FROM = process.env.EMAIL_FROM ?? "ShopSpace <no-reply@shopspace.com>"
+export const BREVO_API_KEY = required("BREVO_API_KEY")
+export const EMAIL_FROM = required("EMAIL_FROM")
+export const EMAIL_FROM_NAME = required("EMAIL_FROM_NAME")
 
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string
 
