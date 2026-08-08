@@ -47,6 +47,11 @@ export const cloudinary = {
   apiSecret: required('CLOUDINARY_API_SECRET'),
 }
 
+export const aiAdvisor = {
+  baseUrl: required('AI_ADVISOR_BASE_URL'),
+  apiKey: required('AI_ADVISOR_API_KEY'),
+}
+
 export const USER_ACCESS_TOKEN_SIGNATURE = process.env.JWT_ACCESS_SECRET as string
 export const USER_REFRESH_TOKEN_SIGNATURE = process.env.JWT_REFRESH_SECRET as string
 export const SYSTEM_ACCESS_TOKEN_SIGNATURE = process.env.SYSTEM_ACCESS_TOKEN_SIGNATURE ?? (process.env.JWT_ACCESS_SECRET as string)
