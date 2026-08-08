@@ -251,11 +251,11 @@ Public browsing uses `GET /api/v1/listings` and supports filters for city, distr
 ### C. Media Flow
 1. Landlord sends `POST /api/v1/listings/:id/media` with multipart field `photos`.
 2. `multer` validates PNG/JPG files and a 20MB max size per file.
-3. Files are stored locally under `uploads/listings` through `upload.service.ts`.
-4. The listing stores media URLs in its embedded `media[]` array.
-5. Owner-only endpoints can delete media or update `sortOrder`.
+3. Files are kept in memory and streamed to Cloudinary through `upload.service.ts`.
+4. The listing stores Cloudinary `url` and internal `publicId` values in its embedded `media[]` array.
+5. Owner-only endpoints can delete media from the listing, attempt Cloudinary cleanup via `publicId`, or update `sortOrder`.
 
-This local storage service is intentionally isolated so S3 or Cloudinary can replace it later without changing controller logic.
+The upload service remains isolated so future media provider changes stay behind the same small interface.
 
 ### D. Saved Listings Flow
 1. Authenticated user sends `POST /api/v1/listings/:id/save`.
@@ -263,6 +263,17 @@ This local storage service is intentionally isolated so S3 or Cloudinary can rep
 3. `DELETE /api/v1/listings/:id/save` removes it idempotently.
 4. `GET /api/v1/users/me/saved-listings` returns card-friendly populated listing data for the tenant Saved Listings screen.
 5. `GET /api/v1/listings` and `GET /api/v1/listings/:id` include `isSaved` when the request has a valid authenticated user.
+
+### E. AI Advisor Flow
+1. Authenticated users send `POST /api/v1/advisor/chat` with `{ message, sessionId? }`.
+2. The backend validates the message length before calling the external AI Advisor service.
+3. For a new chat, the backend calls the external `/chat` endpoint, stores the returned `session_id` in `ChatSession`, and ties it to the authenticated user.
+4. For follow-up chats, the backend verifies that `sessionId` belongs to the authenticated user before calling the external service. Unknown or foreign sessions are rejected before proxying.
+5. `GET /api/v1/advisor/sessions/:sessionId/messages` uses the same ownership check before calling the external history endpoint. This is security-critical because the external service does not enforce ownership by itself.
+6. Recommendations are category-based only: the backend reads the most common `category` from the AI response sources and reuses `listing.service.ts` to fetch up to 3 newest `AVAILABLE` listings in that category.
+7. The AI response sources are knowledge-base document references, not real estate listings. They do not contain prices, locations, images, or scores.
+
+The frontend mockup may show AI recommendation scores, but there is currently no real data source for those numbers. The backend intentionally does not fabricate or return a score.
 
 ## 6) Core Components and Their Roles
 
@@ -303,7 +314,9 @@ This local storage service is intentionally isolated so S3 or Cloudinary can rep
 - **Adding a role reissues tokens; switching the active role does not.** This distinction matters because one changes what the user can do (needs a fresh token to reflect it immediately) and the other only changes what's displayed.
 - **Listings use manual status transitions.** New listings default to `PENDING`; `PATCH /api/v1/listings/:id/status` is the explicit path to mark a listing `AVAILABLE`, `RENTED`, or `EXPIRED`.
 - **City/district are structured fields.** They are required for search and filtering, while `address` should be street/building detail.
-- **Media is local for now.** The upload service is deliberately small and swappable for cloud storage later.
+- **Media is stored in Cloudinary.** The upload service streams in-memory files to Cloudinary and stores `publicId` internally for deletion.
+- **AI Advisor sessions are owned locally.** The external AI service trusts `session_id`, so our backend stores session ownership and rejects cross-user history access before proxying.
+- **Advisor recommendations are category-only.** They reuse listing search logic and do not include AI scores.
 
 ## 8) Flagged Product Decisions
 
@@ -334,3 +347,8 @@ Additional Phase 2 reading:
 - `src/modules/listing/listing.routes.ts`
 - `src/modules/media/media.routes.ts`
 - `src/common/services/upload.service.ts`
+- `src/DB/models/chat-session.model.ts`
+- `src/DB/repository/chat-session.repository.ts`
+- `src/modules/advisor/advisor.service.ts`
+- `src/modules/advisor/advisor.routes.ts`
+- `src/common/services/ai-advisor.service.ts`

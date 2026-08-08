@@ -2220,6 +2220,178 @@
           }
         }
       ]
+    },
+    {
+      "name": "6. AI Advisor",
+      "item": [
+        {
+          "name": "Send Chat Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Advisor session returned', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.data.sessionId).to.exist;",
+                  "  pm.environment.set('advisorSessionId', body.data.sessionId);",
+                  "});",
+                  "pm.test('Recommendations do not include fake scores', () => {",
+                  "  const listings = pm.response.json().data.recommendedListings || [];",
+                  "  listings.forEach((listing) => pm.expect(listing).to.not.have.property('score'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What kind of business should I open in New Cairo?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/advisor/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "advisor",
+                "chat"
+              ]
+            }
+          },
+          "description": "First advisor message. Saves returned sessionId into {{advisorSessionId}} for follow-up and history requests."
+        },
+        {
+          "name": "Send Follow-up Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Uses existing advisor session', () => {",
+                  "  pm.expect(pm.response.json().data.sessionId).to.eql(pm.environment.get('advisorSessionId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What licenses and location factors should I consider?\",\n  \"sessionId\": \"{{advisorSessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/advisor/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "advisor",
+                "chat"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Session Messages",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/advisor/sessions/{{advisorSessionId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "advisor",
+                "sessions",
+                "{{advisorSessionId}}",
+                "messages"
+              ]
+            }
+          },
+          "description": "Requires {{advisorSessionId}} from Send Chat Message. Backend verifies session ownership before proxying to the AI service."
+        },
+        {
+          "name": "Get Session Messages - Not Owner (expect 403/404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403 or 404', () => pm.expect([403, 404]).to.include(pm.response.code));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{otherLandlordAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/advisor/sessions/{{advisorSessionId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "advisor",
+                "sessions",
+                "{{advisorSessionId}}",
+                "messages"
+              ]
+            }
+          },
+          "description": "Use a token from a different user in {{otherLandlordAccessToken}}. Our backend must reject before calling the external AI service."
+        }
+      ]
     }
   ]
 }

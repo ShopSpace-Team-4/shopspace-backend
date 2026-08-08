@@ -27,3 +27,12 @@ export const forgotPasswordRateLimiter = makeLimiter(
 
 // Prevents OTP spam that could rack up email-sending costs / annoy users.
 export const resendOtpRateLimiter = makeLimiter(3, 'Too many OTP requests. Please try again later.');
+
+export const aiAdvisorRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.userId || 'anonymous',
+  message: { success: false, message: 'Too many AI Advisor requests. Please try again later.' },
+});

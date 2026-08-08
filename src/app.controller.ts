@@ -7,6 +7,7 @@ import { authRoutes } from "./modules/auth";
 import { userRoutes } from "./modules/user";
 import { listingRoutes } from "./modules/listing";
 import { mediaRoutes } from "./modules/media";
+import { advisorRoutes } from "./modules/advisor";
 import DBConnection from "./DB/connection.db";
 import { globalErrorHandler } from "./middleware/error.middleware";
 const bootsrap = async () => {
@@ -23,6 +24,7 @@ const bootsrap = async () => {
   // ---- API routes ----
   app.use('/api/v1/auth', authRoutes)
   app.use('/api/v1/users', userRoutes)
+  app.use('/api/v1/advisor', advisorRoutes)
   app.use('/api/v1/listings/:id/media', mediaRoutes)
   app.use('/api/v1/listings', listingRoutes)
 
