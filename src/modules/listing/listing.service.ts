@@ -3,9 +3,10 @@ import { listingRepository } from '../../DB/repository/listing.repository';
 import { userRepository } from '../../DB/repository/user.repository';
 import { IListing, IListingMedia } from '../../common/interfaces/listing.interface';
 import { BadRequestException, ForbiddenException, NotFoundException } from '../../common/exceptions';
-import { ListingAmenity, ListingStatus, MediaType, Role } from '../../common/enums';
+import { ListingAmenity, ListingCategory, ListingStatus, MediaType, Role } from '../../common/enums';
 import { CreateListingDto, ReorderMediaDto, UpdateListingDto, UpdateListingStatusDto } from './listing.dto';
 import { StoredUpload, uploadService } from '../../common/services/upload.service';
+import { createWhatsAppLink } from '../../common/utils/whatsapp-link.util';
 
 type ListingQuery = Record<string, string | string[] | undefined>;
 
@@ -21,29 +22,36 @@ class ListingService {
 
   async list(query: ListingQuery, userId?: string) {
     const filter = this.buildFilter(query);
-    const page = Math.max(Number(query.page) || 1, 1);
-    const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
-    const sort = this.buildSort(typeof query.sort === 'string' ? query.sort : undefined);
-    const listings = await listingRepository.find(filter);
+    const page = this.parsePositiveInteger(query.page, 'page', 1);
+    const limit = this.parsePositiveInteger(query.limit, 'limit', 20, 100);
+    const sort = this.buildSort(this.getQueryValue(query.sort, 'sort'));
+    const { items: listings, total } = await listingRepository.findWithPagination(
+      filter,
+      sort,
+      (page - 1) * limit,
+      limit
+    );
     const savedIds = await this.getSavedListingIds(userId);
-    const sorted = listings.sort((a, b) => this.compareListings(a, b, sort));
-    const paged = sorted.slice((page - 1) * limit, page * limit);
 
     return {
-      items: paged.map((listing) => this.toListingResponse(listing, userId, savedIds)),
+      items: listings.map((listing) => this.toListingResponse(listing, userId, savedIds)),
       meta: {
         page,
         limit,
-        total: listings.length,
-        pages: Math.ceil(listings.length / limit),
+        total,
+        pages: Math.ceil(total / limit),
       },
     };
   }
 
   async getById(id: string, userId?: string) {
     const listing = await this.findListing(id);
-    const savedIds = await this.getSavedListingIds(userId);
-    return this.toListingResponse(listing, userId, savedIds);
+    const [savedIds, landlord] = await Promise.all([
+      this.getSavedListingIds(userId),
+      userRepository.findById(listing.landlordId),
+    ]);
+    const whatsappLink = this.getWhatsAppLink(landlord?.phone, listing.title);
+    return this.toListingResponse(listing, userId, savedIds, whatsappLink);
   }
 
   async getMyListings(landlordId: string) {
@@ -183,12 +191,31 @@ class ListingService {
 
   private buildFilter(query: ListingQuery): FilterQuery<IListing> {
     const filter: FilterQuery<IListing> = {};
-    if (query.city) filter.city = query.city;
-    if (query.district) filter.district = query.district;
-    if (query.category) filter.category = query.category;
-    if (query.status) filter.status = query.status;
-    if (query.priceMin || query.priceMax) filter.annualRent = this.range(query.priceMin, query.priceMax);
-    if (query.areaMin || query.areaMax) filter.areaSqm = this.range(query.areaMin, query.areaMax);
+    const city = this.getQueryValue(query.city, 'city');
+    const area = this.getQueryValue(query.area, 'area') ?? this.getQueryValue(query.district, 'district');
+    const shopType = this.getQueryValue(query.shopType, 'shopType') ?? this.getQueryValue(query.category, 'category');
+    const status = this.getQueryValue(query.status, 'status');
+    const priceMin = this.getQueryValue(query.priceMin, 'priceMin');
+    const priceMax = this.getQueryValue(query.priceMax, 'priceMax');
+    const sizeMin = this.getQueryValue(query.sizeMin, 'sizeMin') ?? this.getQueryValue(query.areaMin, 'areaMin');
+    const sizeMax = this.getQueryValue(query.sizeMax, 'sizeMax') ?? this.getQueryValue(query.areaMax, 'areaMax');
+
+    if (city) filter.city = city;
+    if (area) filter.district = area;
+    if (shopType) {
+      if (!Object.values(ListingCategory).includes(shopType as ListingCategory)) {
+        throw new BadRequestException('Invalid shopType');
+      }
+      filter.category = shopType as ListingCategory;
+    }
+    if (status) {
+      if (!Object.values(ListingStatus).includes(status as ListingStatus)) {
+        throw new BadRequestException('Invalid status');
+      }
+      filter.status = status as ListingStatus;
+    }
+    if (priceMin !== undefined || priceMax !== undefined) filter.annualRent = this.range(priceMin, priceMax, 'price');
+    if (sizeMin !== undefined || sizeMax !== undefined) filter.areaSqm = this.range(sizeMin, sizeMax, 'size');
     if (query.amenities) {
       const amenities = Array.isArray(query.amenities) ? query.amenities : query.amenities.split(',');
       filter.amenities = { $all: amenities as ListingAmenity[] };
@@ -196,28 +223,59 @@ class ListingService {
     return filter;
   }
 
-  private range(min?: string | string[], max?: string | string[]) {
+  private range(min: string | undefined, max: string | undefined, field: string) {
     const query: { $gte?: number; $lte?: number } = {};
-    if (typeof min === 'string') query.$gte = Number(min);
-    if (typeof max === 'string') query.$lte = Number(max);
+    if (min !== undefined) query.$gte = this.parseNonNegativeNumber(min, `${field}Min`);
+    if (max !== undefined) query.$lte = this.parseNonNegativeNumber(max, `${field}Max`);
+    if (query.$gte !== undefined && query.$lte !== undefined && query.$gte > query.$lte) {
+      return { $gt: query.$gte, $lt: query.$lte };
+    }
     return query;
   }
 
   private buildSort(sort?: string) {
-    const [field = 'createdAt', direction = 'desc'] = (sort || '').split(':');
-    return { field, direction: direction === 'asc' ? 1 : -1 };
+    const [requestedField = 'createdAt', direction = 'desc'] = (sort?.trim() || 'createdAt:desc').split(':');
+    const fields: Record<string, string> = {
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt',
+      annualRent: 'annualRent',
+      price: 'annualRent',
+      areaSqm: 'areaSqm',
+      size: 'areaSqm',
+      title: 'title',
+    };
+    const field = fields[requestedField];
+    if (!field || !['asc', 'desc'].includes(direction)) {
+      throw new BadRequestException('Invalid sort. Use field:asc or field:desc');
+    }
+    return { [field]: direction === 'asc' ? 1 : -1 } as Record<string, 1 | -1>;
   }
 
-  private compareListings(a: IListing, b: IListing, sort: { field: string; direction: number }) {
-    const aValue = a[sort.field as keyof IListing] as string | number | Date | undefined;
-    const bValue = b[sort.field as keyof IListing] as string | number | Date | undefined;
-    if (aValue === bValue) return 0;
-    if (aValue === undefined) return 1;
-    if (bValue === undefined) return -1;
-    return aValue > bValue ? sort.direction : -sort.direction;
+  private getQueryValue(value: string | string[] | undefined, field: string) {
+    if (Array.isArray(value)) throw new BadRequestException(`${field} must be provided once`);
+    return value;
   }
 
-  private toListingResponse(listing: IListing, userId?: string, savedIds = new Set<string>()) {
+  private parsePositiveInteger(value: string | string[] | undefined, field: string, fallback: number, maximum?: number) {
+    const rawValue = this.getQueryValue(value, field);
+    if (rawValue === undefined) return fallback;
+    if (!/^\d+$/.test(rawValue)) throw new BadRequestException(`${field} must be a positive integer`);
+    const parsed = Number(rawValue);
+    if (parsed < 1) {
+      throw new BadRequestException(`${field} must be at least 1`);
+    }
+    return maximum !== undefined ? Math.min(parsed, maximum) : parsed;
+  }
+
+  private parseNonNegativeNumber(value: string, field: string) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      throw new BadRequestException(`${field} must be a non-negative number`);
+    }
+    return parsed;
+  }
+
+  private toListingResponse(listing: IListing, userId?: string, savedIds = new Set<string>(), whatsappLink?: string | null) {
     const sortedMedia = [...listing.media].sort((a, b) => a.sortOrder - b.sortOrder);
     const responseMedia = sortedMedia.map((item) => ({
       _id: item._id,
@@ -248,6 +306,7 @@ class ListingService {
       media: responseMedia,
       thumbnailUrl: this.getThumbnailUrl(sortedMedia),
       isSaved: userId ? savedIds.has(listing._id.toString()) : undefined,
+      ...(whatsappLink !== undefined ? { whatsappLink } : {}),
       createdAt: listing.createdAt,
       updatedAt: listing.updatedAt,
     };
@@ -255,6 +314,16 @@ class ListingService {
 
   private getThumbnailUrl(media: IListingMedia[]) {
     return [...media].sort((a, b) => a.sortOrder - b.sortOrder)[0]?.url;
+  }
+
+  private getWhatsAppLink(phoneNumber: string | undefined, listingTitle: string) {
+    if (!phoneNumber) return null;
+    try {
+      return createWhatsAppLink(phoneNumber, listingTitle);
+    } catch (error) {
+      console.error(`Invalid landlord phone for WhatsApp link on listing "${listingTitle}"`, error);
+      return null;
+    }
   }
 
   private withVat(annualRent: number) {
