@@ -1,10 +1,11 @@
 import { Types } from 'mongoose';
 import { chatSessionRepository } from '../../DB/repository/chat-session.repository';
-import { AiAdvisorSource, aiAdvisorService } from '../../common/services/ai-advisor.service';
+import { aiAdvisorService } from '../../common/services/ai-advisor.service';
 import { ForbiddenException } from '../../common/exceptions';
 import { ListingStatus } from '../../common/enums';
 import { listingService } from '../listing/listing.service';
 import { ChatMessageDto } from './advisor.dto';
+import { getListingCategoryFromAdvisorSources } from './advisor-category.mapper';
 
 class AdvisorService {
   async sendMessage(userId: string, dto: ChatMessageDto) {
@@ -18,7 +19,7 @@ class AdvisorService {
       user_id: userId,
     });
 
-    const category = this.getMostCommonCategory(response.sources);
+    const category = getListingCategoryFromAdvisorSources(response.sources);
     const recommendedListings = category ? await this.getRecommendedListings(category, userId) : [];
 
     if (existingSession) {
@@ -51,17 +52,6 @@ class AdvisorService {
       throw new ForbiddenException('Advisor session does not belong to this user');
     }
     return session;
-  }
-
-  private getMostCommonCategory(sources: AiAdvisorSource[] = []) {
-    const counts = sources.reduce((acc, source) => {
-      const category = source.category?.trim();
-      if (!category) return acc;
-      acc.set(category, (acc.get(category) || 0) + 1);
-      return acc;
-    }, new Map<string, number>());
-
-    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
   }
 
   private async getRecommendedListings(category: string, userId: string) {
